@@ -35,7 +35,7 @@ menu:
 code_blocks:
   # Code block theme: darker / pale night / light / ocean / false
   theme: light
-  macStyle: true
+  macStyle: false
   # Code block height limit (unit: px)
   height_limit: false
   word_wrap: false
@@ -67,16 +67,16 @@ avatar:
 disable_top_img: false
 
 # If the banner of page not setting, it will show the default_top_img
-default_top_img: /img/category_img.png
+default_top_img: /img/default_top_img.png
 
 # The banner image of index page
 index_img: /img/bg.png
 
 # The banner image of archive page
-archive_img: /img/archive_img.png
+archive_img: 
 
 # Note: tag page, not tags page
-tag_img: /img/tag_img.png
+tag_img: 
 
 # The banner image of tag page, you can set the banner image for each tag
 # Format:
@@ -84,7 +84,7 @@ tag_img: /img/tag_img.png
 tag_per_img:
 
 # Note: category page, not categories page
-category_img: /img/category_img.png
+category_img: 
 
 # The banner image of category page, you can set the banner image for each category
 # Format:
