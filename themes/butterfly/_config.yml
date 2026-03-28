@@ -55,8 +55,8 @@ social:
 favicon: /img/favicon.png
 
 avatar:
-  img: /img/butterfly-icon.png
-  effect: false
+  img: /img/moss.jpg
+  effect: true
 
 # Disable all banner images
 disable_top_img: false
@@ -65,7 +65,7 @@ disable_top_img: false
 default_top_img:
 
 # The banner image of index page
-index_img:
+index_img: /img/bg.png
 
 # The banner image of archive page
 archive_img:
@@ -148,7 +148,7 @@ index_top_img_height:
 
 # The subtitle on homepage
 subtitle:
-  enable: false
+  enable: true
   # Typewriter Effect
   effect: true
   # Customize typed.js
@@ -283,7 +283,7 @@ aside:
     category: true
   card_author:
     enable: true
-    description:
+    description: 游戏开发 | Unity | C#
     button:
       enable: true
       icon: fab fa-github
