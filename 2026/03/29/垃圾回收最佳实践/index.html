@@ -1,0 +1,496 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Unity 垃圾回收最佳实践 | Moss's Blog</title><meta name="author" content="moss"><meta name="copyright" content="moss"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="ffffff"><meta name="description" content="深入讲解 Unity 中的垃圾回收机制及优化技巧，帮助你写出高性能的游戏代码。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Unity 垃圾回收最佳实践">
+<meta property="og:url" content="https://pennyzjr.github.io/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/index.html">
+<meta property="og:site_name" content="Moss&#39;s Blog">
+<meta property="og:description" content="深入讲解 Unity 中的垃圾回收机制及优化技巧，帮助你写出高性能的游戏代码。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://pennyzjr.github.io/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.jpg">
+<meta property="article:published_time" content="2026-03-29T06:24:06.000Z">
+<meta property="article:modified_time" content="2026-03-29T06:59:47.447Z">
+<meta property="article:author" content="moss">
+<meta property="article:tag" content="Unity">
+<meta property="article:tag" content="C#">
+<meta property="article:tag" content="GC">
+<meta property="article:tag" content="性能优化">
+<meta property="article:tag" content="内存管理">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://pennyzjr.github.io/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Unity 垃圾回收最佳实践",
+  "url": "https://pennyzjr.github.io/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/",
+  "image": "https://pennyzjr.github.io/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.jpg",
+  "datePublished": "2026-03-29T06:24:06.000Z",
+  "dateModified": "2026-03-29T06:59:47.447Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "moss",
+      "url": "https://PennyZJR.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/cowcat.png"><link rel="canonical" href="https://pennyzjr.github.io/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', 'ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          const mediaQueryDark = window.matchMedia('(prefers-color-scheme: dark)')
+          const mediaQueryLight = window.matchMedia('(prefers-color-scheme: light)')
+
+          if (theme === undefined) {
+            if (mediaQueryLight.matches) activateLightMode()
+            else if (mediaQueryDark.matches) activateDarkMode()
+            else {
+              const hour = new Date().getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            mediaQueryDark.addEventListener('change', () => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else {
+            theme === 'light' ? activateLightMode() : activateDarkMode()
+          }
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Unity 垃圾回收最佳实践',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/moss.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">1</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">5</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url(/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.jpg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/cowcat.png" alt="Logo"><span class="site-name">Moss's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">Unity 垃圾回收最佳实践</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">Unity 垃圾回收最佳实践</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-29T06:24:06.000Z" title="发表于 2026-03-29 14:24:06">2026-03-29</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-03-29T06:59:47.447Z" title="更新于 2026-03-29 14:59:47">2026-03-29</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%B8%B8%E6%88%8F%E5%BC%80%E5%8F%91/">游戏开发</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%B8%B8%E6%88%8F%E5%BC%80%E5%8F%91/Unity/">Unity</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="Unity-垃圾回收最佳实践"><a href="#Unity-垃圾回收最佳实践" class="headerlink" title="Unity 垃圾回收最佳实践"></a>Unity 垃圾回收最佳实践</h1><h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在 Unity 游戏开发中，垃圾回收（Garbage Collection，简称 GC）是影响游戏性能的关键因素之一。当 GC 触发时，游戏主线程会被暂停，导致帧率下降、卡顿等问题。特别是在移动设备上，频繁的 GC 甚至会造成明显的卡顿感。</p>
+<p>本文基于 Unity 官方文档，详细讲解 GC 产生的原因以及优化技巧，帮助你写出高性能的游戏代码。</p>
+<hr>
+<h2 id="1-理解-Unity-的-GC-机制"><a href="#1-理解-Unity-的-GC-机制" class="headerlink" title="1. 理解 Unity 的 GC 机制"></a>1. 理解 Unity 的 GC 机制</h2><h3 id="1-1-什么是托管堆（Managed-Heap）"><a href="#1-1-什么是托管堆（Managed-Heap）" class="headerlink" title="1.1 什么是托管堆（Managed Heap）"></a>1.1 什么是托管堆（Managed Heap）</h3><p>在 C# 中，内存分为两种：</p>
+<ul>
+<li><strong>栈（Stack）</strong>：存储值类型（int、float、struct 等），自动管理</li>
+<li><strong>托管堆（Managed Heap）</strong>：存储引用类型（class、string、array 等），由 GC 管理</li>
+</ul>
+<p>当你创建一个引用类型对象时，Unity 会在托管堆上分配内存。当这个对象不再被引用时，GC 会回收这块内存。</p>
+<h3 id="1-2-Unity-的-GC-特点"><a href="#1-2-Unity-的-GC-特点" class="headerlink" title="1.2 Unity 的 GC 特点"></a>1.2 Unity 的 GC 特点</h3><p><strong>重要：Unity 的 GC 不是分代式的（Non-generational）</strong></p>
+<p>.NET 的 GC 是分代式的，可以高效处理大量小对象。但 Unity 使用的是 Boehm GC，它会扫描整个托管堆，这意味着：</p>
+<ul>
+<li>GC 时间与托管堆大小成正比</li>
+<li>频繁创建小对象会导致频繁的 GC</li>
+<li>GC 暂停时间可能很长</li>
+</ul>
+<h3 id="1-3-什么时候会触发-GC"><a href="#1-3-什么时候会触发-GC" class="headerlink" title="1.3 什么时候会触发 GC"></a>1.3 什么时候会触发 GC</h3><ul>
+<li>托管堆空间不足时</li>
+<li>手动调用 <code>System.GC.Collect()</code>（不推荐）</li>
+<li>场景加载时</li>
+</ul>
+<hr>
+<h2 id="2-引用类型管理"><a href="#2-引用类型管理" class="headerlink" title="2. 引用类型管理"></a>2. 引用类型管理</h2><h3 id="2-1-避免重复字符串拼接"><a href="#2-1-避免重复字符串拼接" class="headerlink" title="2.1 避免重复字符串拼接"></a>2.1 避免重复字符串拼接</h3><p>字符串在 C# 中是<strong>不可变的引用类型</strong>。每次拼接字符串，都会创建一个新的字符串对象，旧的字符串对象变成垃圾。</p>
+<p><strong>❌ 错误示例：在 Update 中拼接字符串</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">ExampleScript</span> : <span class="title">MonoBehaviour</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> Text scoreBoard;</span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">int</span> score;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 每帧都创建新字符串，产生大量 GC</span></span><br><span class="line">        <span class="built_in">string</span> scoreText = <span class="string">&quot;Score: &quot;</span> + score.ToString();</span><br><span class="line">        scoreBoard.text = scoreText;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：只在分数变化时更新</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">ExampleScript</span> : <span class="title">MonoBehaviour</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> Text scoreBoard;</span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">int</span> score;</span><br><span class="line">    <span class="keyword">private</span> <span class="built_in">int</span> oldScore;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (score != oldScore)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="built_in">string</span> scoreText = <span class="string">&quot;Score: &quot;</span> + score.ToString();</span><br><span class="line">            scoreBoard.text = scoreText;</span><br><span class="line">            oldScore = score;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 更优方案：完全避免字符串拼接</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">ExampleScript</span> : <span class="title">MonoBehaviour</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> Text scoreBoardTitle;</span><br><span class="line">    <span class="keyword">public</span> Text scoreBoardDisplay;</span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">int</span> score;</span><br><span class="line">    <span class="keyword">private</span> <span class="built_in">int</span> oldScore;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Start</span>()</span></span><br><span class="line">    &#123;</span><br><span class="line">        scoreBoardTitle.text = <span class="string">&quot;Score: &quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (score != oldScore)</span><br><span class="line">        &#123;</span><br><span class="line">            scoreBoardDisplay.text = score.ToString();</span><br><span class="line">            oldScore = score;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 使用 StringBuilder 处理大量字符串拼接</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> System.Text;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">ExampleScript</span> : <span class="title">MonoBehaviour</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">private</span> StringBuilder _sb = <span class="keyword">new</span> StringBuilder(<span class="number">16</span>);</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="built_in">string</span> <span class="title">ConcatExample</span>(<span class="params"><span class="built_in">string</span>[] stringArray</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        _sb.Clear();</span><br><span class="line">        <span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; stringArray.Length; i++)</span><br><span class="line">        &#123;</span><br><span class="line">            _sb.Append(stringArray[i]);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> _sb.ToString();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-避免闭包和匿名方法"><a href="#2-2-避免闭包和匿名方法" class="headerlink" title="2.2 避免闭包和匿名方法"></a>2.2 避免闭包和匿名方法</h3><p>方法引用在 C# 中是引用类型，会在托管堆上分配内存。特别是<strong>闭包</strong>，会创建额外的匿名类实例。</p>
+<p><strong>❌ 错误示例：使用闭包</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">int</span> desiredDivisor = GetDesiredDivisor();</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 匿名方法引用了外部变量 desiredDivisor，形成闭包</span></span><br><span class="line">    <span class="comment">// 每次调用都会分配内存</span></span><br><span class="line">    listOfNumbers.Sort((x, y) =&gt;</span><br><span class="line">        (<span class="built_in">int</span>)x.CompareTo((<span class="built_in">int</span>)(y / desiredDivisor))</span><br><span class="line">    );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：避免使用外部变量</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 使用常量或成员变量，避免闭包</span></span><br><span class="line">    listOfNumbers.Sort((x, y) =&gt;</span><br><span class="line">        (<span class="built_in">int</span>)x.CompareTo((<span class="built_in">int</span>)(y / <span class="number">2</span>))</span><br><span class="line">    );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 更优方案：使用预定义的比较器</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">class</span> <span class="title">MyComparer</span> : <span class="title">IComparer</span>&lt;<span class="title">float</span>&gt;</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="built_in">int</span> _divisor;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">MyComparer</span>(<span class="params"><span class="built_in">int</span> divisor</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        _divisor = divisor;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="built_in">int</span> <span class="title">Compare</span>(<span class="params"><span class="built_in">float</span> x, <span class="built_in">float</span> y</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> x.CompareTo(y / _divisor);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> MyComparer _comparer = <span class="keyword">new</span> MyComparer(<span class="number">2</span>);</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    listOfNumbers.Sort(_comparer);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-避免装箱（Boxing）"><a href="#2-3-避免装箱（Boxing）" class="headerlink" title="2.3 避免装箱（Boxing）"></a>2.3 避免装箱（Boxing）</h3><p><strong>装箱</strong>是指将值类型自动转换为引用类型。这是 Unity 项目中最常见的意外内存分配来源。</p>
+<p><strong>❌ 错误示例：装箱</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">int</span> x = <span class="number">1</span>;</span><br><span class="line"><span class="built_in">object</span> y = <span class="keyword">new</span> <span class="built_in">object</span>();</span><br><span class="line">y.Equals(x);  <span class="comment">// x 被装箱为 object，产生 GC</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>❌ 常见的装箱场景：使用 ArrayList</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ArrayList 只接受 object，值类型会被装箱</span></span><br><span class="line">ArrayList list = <span class="keyword">new</span> ArrayList();</span><br><span class="line">list.Add(<span class="number">1</span>);      <span class="comment">// int 被装箱</span></span><br><span class="line">list.Add(<span class="number">2.5f</span>);   <span class="comment">// float 被装箱</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：使用泛型集合</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// List&lt;T&gt; 是强类型，不会装箱</span></span><br><span class="line">List&lt;<span class="built_in">int</span>&gt; list = <span class="keyword">new</span> List&lt;<span class="built_in">int</span>&gt;();</span><br><span class="line">list.Add(<span class="number">1</span>);      <span class="comment">// 不会产生 GC</span></span><br><span class="line">list.Add(<span class="number">2</span>);</span><br></pre></td></tr></table></figure>
+
+<p><strong>如何识别装箱：</strong></p>
+<p>在 CPU Profiler 中，装箱会显示为以下形式：</p>
+<ul>
+<li><code>System.Int32::Box(int32)</code></li>
+<li><code>System.Single::Box(float)</code></li>
+</ul>
+<h3 id="2-4-避免-params-修饰符"><a href="#2-4-避免-params-修饰符" class="headerlink" title="2.4 避免 params 修饰符"></a>2.4 避免 params 修饰符</h3><p>使用 <code>params</code> 修饰符的方法会自动创建一个数组来存储参数。</p>
+<p><strong>❌ 错误示例</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 这个方法每次调用都会创建数组</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">LogMessage</span>(<span class="params"><span class="keyword">params</span> <span class="built_in">object</span>[] <span class="keyword">args</span></span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    LogMessage(<span class="string">&quot;Health:&quot;</span>, <span class="number">100</span>);  <span class="comment">// 每帧产生 GC</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：使用方法重载</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 提供不使用 params 的重载版本</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">LogMessage</span>(<span class="params"><span class="built_in">string</span> msg</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">LogMessage</span>(<span class="params"><span class="built_in">string</span> msg, <span class="built_in">int</span> <span class="keyword">value</span></span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="3-数组优化"><a href="#3-数组优化" class="headerlink" title="3. 数组优化"></a>3. 数组优化</h2><h3 id="3-1-将数组作为参数传递"><a href="#3-1-将数组作为参数传递" class="headerlink" title="3.1 将数组作为参数传递"></a>3.1 将数组作为参数传递</h3><p><strong>❌ 错误示例：每次都创建新数组</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="built_in">float</span>[] <span class="title">RandomList</span>(<span class="params"><span class="built_in">int</span> numElements</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">var</span> result = <span class="keyword">new</span> <span class="built_in">float</span>[numElements];  <span class="comment">// 每次调用都分配内存</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; numElements; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        result[i] = Random.<span class="keyword">value</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：复用数组</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="built_in">float</span>[] _cachedArray = <span class="keyword">new</span> <span class="built_in">float</span>[<span class="number">100</span>];</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">RandomList</span>(<span class="params"><span class="built_in">float</span>[] arrayToFill</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; arrayToFill.Length; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        arrayToFill[i] = Random.<span class="keyword">value</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    RandomList(_cachedArray);  <span class="comment">// 复用数组，无 GC</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-避免重复访问返回数组的-Unity-API"><a href="#3-2-避免重复访问返回数组的-Unity-API" class="headerlink" title="3.2 避免重复访问返回数组的 Unity API"></a>3.2 避免重复访问返回数组的 Unity API</h3><p>Unity 中很多属性（如 <code>mesh.vertices</code>）每次访问都会创建一个新的数组副本。</p>
+<p><strong>❌ 错误示例：在循环中重复访问</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 每次访问 mesh.vertices 都会创建新数组</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; mesh.vertices.Length; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">float</span> x = mesh.vertices[i].x;  <span class="comment">// 又创建一个新数组</span></span><br><span class="line">        <span class="built_in">float</span> y = mesh.vertices[i].y;  <span class="comment">// 又创建一个新数组</span></span><br><span class="line">        <span class="built_in">float</span> z = mesh.vertices[i].z;  <span class="comment">// 又创建一个新数组</span></span><br><span class="line">        DoSomething(x, y, z);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：缓存数组</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">var</span> vertices = mesh.vertices;  <span class="comment">// 只创建一次数组</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; vertices.Length; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">float</span> x = vertices[i].x;</span><br><span class="line">        <span class="built_in">float</span> y = vertices[i].y;</span><br><span class="line">        <span class="built_in">float</span> z = vertices[i].z;</span><br><span class="line">        DoSomething(x, y, z);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 更优方案：使用 List 缓存</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> List&lt;Vector3&gt; _vertices = <span class="keyword">new</span> List&lt;Vector3&gt;();</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    mesh.GetVertices(_vertices);  <span class="comment">// 填充现有 List，无额外分配</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; _vertices.Count; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        DoSomething(_vertices[i].x, _vertices[i].y, _vertices[i].z);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>常见的分配内存的 API 及其替代方案：</strong></p>
+<table>
+<thead>
+<tr>
+<th>产生 GC 的 API</th>
+<th>非分配替代方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Physics.RaycastAll()</code></td>
+<td><code>Physics.RaycastNonAlloc()</code></td>
+</tr>
+<tr>
+<td><code>Animator.parameters</code></td>
+<td><code>Animator.parameterCount</code> + <code>Animator.GetParameter()</code></td>
+</tr>
+<tr>
+<td><code>Renderer.sharedMaterials</code></td>
+<td><code>Renderer.GetSharedMaterials()</code></td>
+</tr>
+<tr>
+<td><code>Input.touches</code></td>
+<td><code>Input.touchCount</code> + <code>Input.GetTouch()</code></td>
+</tr>
+</tbody></table>
+<h3 id="3-3-大型数组使用-NativeArray"><a href="#3-3-大型数组使用-NativeArray" class="headerlink" title="3.3 大型数组使用 NativeArray"></a>3.3 大型数组使用 NativeArray</h3><p>当数组元素超过 1 万个时，GC 扫描会变慢。考虑使用 <code>Unity.Collections.NativeArray</code>。</p>
+<p><strong>✅ 使用 NativeArray</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> Unity.Collections;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> NativeArray&lt;<span class="built_in">float</span>&gt; _largeArray;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Start</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    _largeArray = <span class="keyword">new</span> NativeArray&lt;<span class="built_in">float</span>&gt;(<span class="number">10000</span>, Allocator.Persistent);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">OnDestroy</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (_largeArray.IsCreated)</span><br><span class="line">        _largeArray.Dispose();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="4-对象池"><a href="#4-对象池" class="headerlink" title="4. 对象池"></a>4. 对象池</h2><p>对象池是最有效的 GC 优化技术之一，通过复用对象避免频繁的创建和销毁。</p>
+<h3 id="4-1-使用-Unity-内置的-ObjectPool"><a href="#4-1-使用-Unity-内置的-ObjectPool" class="headerlink" title="4.1 使用 Unity 内置的 ObjectPool"></a>4.1 使用 Unity 内置的 ObjectPool</h3><p>Unity 2021+ 提供了 <code>UnityEngine.Pool.ObjectPool&lt;T&gt;</code>。</p>
+<p><strong>✅ 基本用法</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> UnityEngine;</span><br><span class="line"><span class="keyword">using</span> UnityEngine.Pool;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">BulletManager</span> : <span class="title">MonoBehaviour</span></span><br><span class="line">&#123;</span><br><span class="line">    [<span class="meta">SerializeField</span>] <span class="keyword">private</span> Bullet bulletPrefab;</span><br><span class="line">    <span class="keyword">private</span> ObjectPool&lt;Bullet&gt; _bulletPool;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Awake</span>()</span></span><br><span class="line">    &#123;</span><br><span class="line">        _bulletPool = <span class="keyword">new</span> ObjectPool&lt;Bullet&gt;(</span><br><span class="line">            createFunc: () =&gt; Instantiate(bulletPrefab),</span><br><span class="line">            actionOnGet: (bullet) =&gt; bullet.gameObject.SetActive(<span class="literal">true</span>),</span><br><span class="line">            actionOnRelease: (bullet) =&gt; bullet.gameObject.SetActive(<span class="literal">false</span>),</span><br><span class="line">            actionOnDestroy: (bullet) =&gt; Destroy(bullet.gameObject),</span><br><span class="line">            collectionCheck: <span class="literal">true</span>,</span><br><span class="line">            defaultCapacity: <span class="number">20</span>,</span><br><span class="line">            maxSize: <span class="number">100</span></span><br><span class="line">        );</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Bullet <span class="title">GetBullet</span>()</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> _bulletPool.Get();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">ReturnBullet</span>(<span class="params">Bullet bullet</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        _bulletPool.Release(bullet);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-集合类型对象池"><a href="#4-2-集合类型对象池" class="headerlink" title="4.2 集合类型对象池"></a>4.2 集合类型对象池</h3><p>对于临时使用的 List、Dictionary 等集合，可以使用 <code>CollectionPool</code>。</p>
+<p><strong>✅ 使用 CollectionPool</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> UnityEngine.Pool;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 从池中获取 List</span></span><br><span class="line">    <span class="keyword">var</span> list = ListPool&lt;<span class="built_in">int</span>&gt;.Get();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">try</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 使用 list...</span></span><br><span class="line">        list.Add(<span class="number">1</span>);</span><br><span class="line">        list.Add(<span class="number">2</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">finally</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 归还到池中</span></span><br><span class="line">        ListPool&lt;<span class="built_in">int</span>&gt;.Release(list);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="5-foreach-与-GC"><a href="#5-foreach-与-GC" class="headerlink" title="5. foreach 与 GC"></a>5. foreach 与 GC</h2><h3 id="5-1-foreach-产生-GC-的情况"><a href="#5-1-foreach-产生-GC-的情况" class="headerlink" title="5.1 foreach 产生 GC 的情况"></a>5.1 foreach 产生 GC 的情况</h3><p><code>foreach</code> 循环在某些情况下会产生 GC 分配，这取决于你遍历的集合类型。</p>
+<p><strong>❌ 产生 GC 的情况：</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 遍历 List&lt;T&gt; - 每次都会分配 IEnumerator</span></span><br><span class="line">List&lt;<span class="built_in">int</span>&gt; list = <span class="keyword">new</span> List&lt;<span class="built_in">int</span>&gt; &#123; <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span> &#125;;</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">var</span> item <span class="keyword">in</span> list)  <span class="comment">// 产生 GC</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 遍历 Dictionary - 每次都会分配 IEnumerator</span></span><br><span class="line">Dictionary&lt;<span class="built_in">int</span>, <span class="built_in">string</span>&gt; dict = <span class="keyword">new</span> Dictionary&lt;<span class="built_in">int</span>, <span class="built_in">string</span>&gt;();</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">var</span> kvp <span class="keyword">in</span> dict)  <span class="comment">// 产生 GC</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 遍历 IEnumerable - 必然产生 GC</span></span><br><span class="line">IEnumerable&lt;<span class="built_in">int</span>&gt; enumerable = GetEnumerable();</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">var</span> item <span class="keyword">in</span> enumerable)  <span class="comment">// 产生 GC</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 不产生 GC 的情况：</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 遍历数组 - C# 5.0+ 不会产生 GC</span></span><br><span class="line"><span class="built_in">int</span>[] array = &#123; <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span> &#125;;</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">var</span> item <span class="keyword">in</span> array)  <span class="comment">// 无 GC</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-使用-for-循环替代"><a href="#5-2-使用-for-循环替代" class="headerlink" title="5.2 使用 for 循环替代"></a>5.2 使用 for 循环替代</h3><p><strong>❌ 遍历 List 的 foreach</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">List&lt;GameObject&gt; objects = GetObjects();</span><br><span class="line"><span class="keyword">foreach</span> (<span class="keyword">var</span> obj <span class="keyword">in</span> objects)  <span class="comment">// 产生 GC</span></span><br><span class="line">&#123;</span><br><span class="line">    obj.transform.position += Vector3.up;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 使用 for 循环</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">List&lt;GameObject&gt; objects = GetObjects();</span><br><span class="line"><span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; objects.Count; i++)  <span class="comment">// 无 GC</span></span><br><span class="line">&#123;</span><br><span class="line">    objects[i].transform.position += Vector3.up;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-3-使用-Span（C-7-2-）"><a href="#5-3-使用-Span（C-7-2-）" class="headerlink" title="5.3 使用 Span（C# 7.2+）"></a>5.3 使用 Span<T>（C# 7.2+）</h3><p>对于数组，可以使用 <code>Span&lt;T&gt;</code> 来避免 GC：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">int</span>[] array = &#123; <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span> &#125;;</span><br><span class="line">Span&lt;<span class="built_in">int</span>&gt; span = array;</span><br><span class="line"><span class="keyword">for</span> (<span class="built_in">int</span> i = <span class="number">0</span>; i &lt; span.Length; i++)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 处理 span[i]</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-4-总结对比"><a href="#5-4-总结对比" class="headerlink" title="5.4 总结对比"></a>5.4 总结对比</h3><table>
+<thead>
+<tr>
+<th>遍历方式</th>
+<th>List<T></th>
+<th>Dictionary</th>
+<th>数组</th>
+<th>IEnumerable</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>foreach</code></td>
+<td>产生 GC</td>
+<td>产生 GC</td>
+<td>✅ 无 GC</td>
+<td>产生 GC</td>
+</tr>
+<tr>
+<td><code>for</code></td>
+<td>✅ 无 GC</td>
+<td>❌ 不支持</td>
+<td>✅ 无 GC</td>
+<td>❌ 不支持</td>
+</tr>
+<tr>
+<td><code>Span&lt;T&gt;</code></td>
+<td>❌ 不支持</td>
+<td>❌ 不支持</td>
+<td>✅ 无 GC</td>
+<td>❌ 不支持</td>
+</tr>
+</tbody></table>
+<p><strong>最佳实践：</strong></p>
+<ul>
+<li>遍历 <code>List&lt;T&gt;</code>、<code>Dictionary</code> 时使用 <code>for</code> 循环</li>
+<li>遍历数组时可以使用 <code>foreach</code>（C# 5.0+）</li>
+<li>在性能关键代码中，优先使用 <code>for</code> 循环</li>
+</ul>
+<hr>
+<h2 id="6-其他最佳实践"><a href="#6-其他最佳实践" class="headerlink" title="6. 其他最佳实践"></a>6. 其他最佳实践</h2><h3 id="6-1-缓存组件引用"><a href="#6-1-缓存组件引用" class="headerlink" title="6.1 缓存组件引用"></a>6.1 缓存组件引用</h3><p><strong>❌ 错误示例：每次都获取组件</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 每帧都调用 GetComponent，产生 GC</span></span><br><span class="line">    <span class="keyword">var</span> renderer = GetComponent&lt;Renderer&gt;();</span><br><span class="line">    renderer.material.color = Color.red;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：缓存组件</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> Renderer _cachedRenderer;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Awake</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    _cachedRenderer = GetComponent&lt;Renderer&gt;();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    _cachedRenderer.material.color = Color.red;  <span class="comment">// 无 GC</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-使用-CompareTag"><a href="#6-2-使用-CompareTag" class="headerlink" title="6.2 使用 CompareTag"></a>6.2 使用 CompareTag</h3><p><strong>❌ 错误示例：使用字符串比较</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">OnTriggerEnter</span>(<span class="params">Collider other</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (other.tag == <span class="string">&quot;Enemy&quot;</span>)  <span class="comment">// 产生 GC</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：使用 CompareTag</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">OnTriggerEnter</span>(<span class="params">Collider other</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (other.CompareTag(<span class="string">&quot;Enemy&quot;</span>))  <span class="comment">// 无 GC</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-避免在-Update-中分配内存"><a href="#6-3-避免在-Update-中分配内存" class="headerlink" title="6.3 避免在 Update 中分配内存"></a>6.3 避免在 Update 中分配内存</h3><p><strong>❌ 错误示例：每帧创建 List</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    List&lt;<span class="built_in">float</span>&gt; nearestNeighbors = <span class="keyword">new</span> List&lt;<span class="built_in">float</span>&gt;();  <span class="comment">// 每帧分配</span></span><br><span class="line">    FindDistances(nearestNeighbors);</span><br><span class="line">    nearestNeighbors.Sort();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>✅ 正确示例：复用 List</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> List&lt;<span class="built_in">float</span>&gt; _nearestNeighbors = <span class="keyword">new</span> List&lt;<span class="built_in">float</span>&gt;();</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Update</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    _nearestNeighbors.Clear();  <span class="comment">// 清空但保留内存</span></span><br><span class="line">    FindDistances(_nearestNeighbors);</span><br><span class="line">    _nearestNeighbors.Sort();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-4-协程的-GC-问题"><a href="#6-4-协程的-GC-问题" class="headerlink" title="6.4 协程的 GC 问题"></a>6.4 协程的 GC 问题</h3><p><code>StartCoroutine</code> 本身也会产生 GC 分配。如果需要频繁启动协程，考虑使用自定义的协程管理器。</p>
+<p><strong>✅ 使用 UniTask 替代（第三方库）</strong></p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 使用 UniTask，几乎零 GC</span></span><br><span class="line"><span class="function"><span class="keyword">async</span> UniTaskVoid <span class="title">DoSomethingAsync</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">await</span> UniTask.Delay(<span class="number">1000</span>);</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="7-性能分析工具"><a href="#7-性能分析工具" class="headerlink" title="7. 性能分析工具"></a>7. 性能分析工具</h2><h3 id="7-1-Unity-Profiler"><a href="#7-1-Unity-Profiler" class="headerlink" title="7.1 Unity Profiler"></a>7.1 Unity Profiler</h3><p>使用 Unity Profiler 分析 GC：</p>
+<ol>
+<li>打开 <strong>Window &gt; Analysis &gt; Profiler</strong></li>
+<li>选择 <strong>Memory</strong> 模块</li>
+<li>查看 <strong>GC Alloc</strong> 列，找出分配内存的代码</li>
+</ol>
+<h3 id="7-2-查找装箱"><a href="#7-2-查找装箱" class="headerlink" title="7.2 查找装箱"></a>7.2 查找装箱</h3><p>在 Profiler 的 <strong>CPU</strong> 模块中，搜索以下方法名：</p>
+<ul>
+<li><code>System.Int32::Box</code></li>
+<li><code>System.Single::Box</code></li>
+<li><code>System.Object::Box</code></li>
+</ul>
+<h3 id="7-3-使用-IL-查看器"><a href="#7-3-使用-IL-查看器" class="headerlink" title="7.3 使用 IL 查看器"></a>7.3 使用 IL 查看器</h3><p>使用 Rider、ReSharper 或 dotPeek 查看 IL 代码，搜索 <code>box</code> 指令来定位装箱。</p>
+<hr>
+<h2 id="8-总结"><a href="#8-总结" class="headerlink" title="8. 总结"></a>8. 总结</h2><h3 id="优化优先级"><a href="#优化优先级" class="headerlink" title="优化优先级"></a>优化优先级</h3><ol>
+<li><strong>避免在 Update 中分配内存</strong>（最高优先级）</li>
+<li><strong>使用对象池</strong>复用 GameObject 和集合</li>
+<li><strong>避免字符串拼接</strong>，特别是每帧的拼接</li>
+<li><strong>使用 for 循环</strong>替代 foreach 遍历 List 和 Dictionary</li>
+<li><strong>缓存组件引用</strong>和 API 调用结果</li>
+<li><strong>使用 CompareTag</strong>替代字符串比较</li>
+<li><strong>避免装箱</strong>，使用泛型集合</li>
+</ol>
+<h3 id="核心原则"><a href="#核心原则" class="headerlink" title="核心原则"></a>核心原则</h3><blockquote>
+<p><strong>在性能关键的代码中（Update、FixedUpdate、LateUpdate），尽量避免任何内存分配。</strong></p>
+</blockquote>
+<p>记住：GC 优化的目标不是完全消除 GC，而是减少 GC 的频率和影响。在合适的时机进行优化，避免过早优化。</p>
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://docs.unity3d.com/6000.0/Documentation/Manual/performance-optimizing-code-managed-memory.html">Unity 官方文档：Optimizing your code for managed memory</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.unity3d.com/6000.0/Documentation/Manual/performance-reference-types.html">Unity 官方文档：Reference type management</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.unity3d.com/6000.0/Documentation/Manual/performance-optimizing-arrays.html">Unity 官方文档：Optimizing arrays</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.unity3d.com/6000.0/Documentation/Manual/performance-reusable-code.html">Unity 官方文档：Pooling and reusing objects</a></li>
+</ul>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://PennyZJR.github.io">moss</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://pennyzjr.github.io/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/">https://pennyzjr.github.io/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://PennyZJR.github.io" target="_blank">Moss's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Unity/">Unity</a><a class="post-meta__tags" href="/tags/C/">C#</a><a class="post-meta__tags" href="/tags/GC/">GC</a><a class="post-meta__tags" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/">性能优化</a><a class="post-meta__tags" href="/tags/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/">内存管理</a></div><div class="post-share"><div class="social-share" data-image="/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.jpg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"></nav><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="giscus-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/moss.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">moss</div><div class="author-info-description">游戏开发 | Unity | C#</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">1</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">5</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/PennyZJR"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/PennyZJR" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:Z20240314Z@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到 Moss's Blog！</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Unity-%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5"><span class="toc-number">1.</span> <span class="toc-text">Unity 垃圾回收最佳实践</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%89%8D%E8%A8%80"><span class="toc-number">1.1.</span> <span class="toc-text">前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E7%90%86%E8%A7%A3-Unity-%E7%9A%84-GC-%E6%9C%BA%E5%88%B6"><span class="toc-number">1.2.</span> <span class="toc-text">1. 理解 Unity 的 GC 机制</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-1-%E4%BB%80%E4%B9%88%E6%98%AF%E6%89%98%E7%AE%A1%E5%A0%86%EF%BC%88Managed-Heap%EF%BC%89"><span class="toc-number">1.2.1.</span> <span class="toc-text">1.1 什么是托管堆（Managed Heap）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-2-Unity-%E7%9A%84-GC-%E7%89%B9%E7%82%B9"><span class="toc-number">1.2.2.</span> <span class="toc-text">1.2 Unity 的 GC 特点</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-3-%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E4%BC%9A%E8%A7%A6%E5%8F%91-GC"><span class="toc-number">1.2.3.</span> <span class="toc-text">1.3 什么时候会触发 GC</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E5%BC%95%E7%94%A8%E7%B1%BB%E5%9E%8B%E7%AE%A1%E7%90%86"><span class="toc-number">1.3.</span> <span class="toc-text">2. 引用类型管理</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E9%81%BF%E5%85%8D%E9%87%8D%E5%A4%8D%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%8B%BC%E6%8E%A5"><span class="toc-number">1.3.1.</span> <span class="toc-text">2.1 避免重复字符串拼接</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E9%81%BF%E5%85%8D%E9%97%AD%E5%8C%85%E5%92%8C%E5%8C%BF%E5%90%8D%E6%96%B9%E6%B3%95"><span class="toc-number">1.3.2.</span> <span class="toc-text">2.2 避免闭包和匿名方法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-%E9%81%BF%E5%85%8D%E8%A3%85%E7%AE%B1%EF%BC%88Boxing%EF%BC%89"><span class="toc-number">1.3.3.</span> <span class="toc-text">2.3 避免装箱（Boxing）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-%E9%81%BF%E5%85%8D-params-%E4%BF%AE%E9%A5%B0%E7%AC%A6"><span class="toc-number">1.3.4.</span> <span class="toc-text">2.4 避免 params 修饰符</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E6%95%B0%E7%BB%84%E4%BC%98%E5%8C%96"><span class="toc-number">1.4.</span> <span class="toc-text">3. 数组优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-%E5%B0%86%E6%95%B0%E7%BB%84%E4%BD%9C%E4%B8%BA%E5%8F%82%E6%95%B0%E4%BC%A0%E9%80%92"><span class="toc-number">1.4.1.</span> <span class="toc-text">3.1 将数组作为参数传递</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-%E9%81%BF%E5%85%8D%E9%87%8D%E5%A4%8D%E8%AE%BF%E9%97%AE%E8%BF%94%E5%9B%9E%E6%95%B0%E7%BB%84%E7%9A%84-Unity-API"><span class="toc-number">1.4.2.</span> <span class="toc-text">3.2 避免重复访问返回数组的 Unity API</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-3-%E5%A4%A7%E5%9E%8B%E6%95%B0%E7%BB%84%E4%BD%BF%E7%94%A8-NativeArray"><span class="toc-number">1.4.3.</span> <span class="toc-text">3.3 大型数组使用 NativeArray</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E5%AF%B9%E8%B1%A1%E6%B1%A0"><span class="toc-number">1.5.</span> <span class="toc-text">4. 对象池</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E4%BD%BF%E7%94%A8-Unity-%E5%86%85%E7%BD%AE%E7%9A%84-ObjectPool"><span class="toc-number">1.5.1.</span> <span class="toc-text">4.1 使用 Unity 内置的 ObjectPool</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E9%9B%86%E5%90%88%E7%B1%BB%E5%9E%8B%E5%AF%B9%E8%B1%A1%E6%B1%A0"><span class="toc-number">1.5.2.</span> <span class="toc-text">4.2 集合类型对象池</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-foreach-%E4%B8%8E-GC"><span class="toc-number">1.6.</span> <span class="toc-text">5. foreach 与 GC</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-foreach-%E4%BA%A7%E7%94%9F-GC-%E7%9A%84%E6%83%85%E5%86%B5"><span class="toc-number">1.6.1.</span> <span class="toc-text">5.1 foreach 产生 GC 的情况</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E4%BD%BF%E7%94%A8-for-%E5%BE%AA%E7%8E%AF%E6%9B%BF%E4%BB%A3"><span class="toc-number">1.6.2.</span> <span class="toc-text">5.2 使用 for 循环替代</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-%E4%BD%BF%E7%94%A8-Span%EF%BC%88C-7-2-%EF%BC%89"><span class="toc-number">1.6.3.</span> <span class="toc-text">5.3 使用 Span（C# 7.2+）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-4-%E6%80%BB%E7%BB%93%E5%AF%B9%E6%AF%94"><span class="toc-number">1.6.4.</span> <span class="toc-text">5.4 总结对比</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E5%85%B6%E4%BB%96%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5"><span class="toc-number">1.7.</span> <span class="toc-text">6. 其他最佳实践</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-%E7%BC%93%E5%AD%98%E7%BB%84%E4%BB%B6%E5%BC%95%E7%94%A8"><span class="toc-number">1.7.1.</span> <span class="toc-text">6.1 缓存组件引用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-%E4%BD%BF%E7%94%A8-CompareTag"><span class="toc-number">1.7.2.</span> <span class="toc-text">6.2 使用 CompareTag</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-3-%E9%81%BF%E5%85%8D%E5%9C%A8-Update-%E4%B8%AD%E5%88%86%E9%85%8D%E5%86%85%E5%AD%98"><span class="toc-number">1.7.3.</span> <span class="toc-text">6.3 避免在 Update 中分配内存</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-4-%E5%8D%8F%E7%A8%8B%E7%9A%84-GC-%E9%97%AE%E9%A2%98"><span class="toc-number">1.7.4.</span> <span class="toc-text">6.4 协程的 GC 问题</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E6%80%A7%E8%83%BD%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7"><span class="toc-number">1.8.</span> <span class="toc-text">7. 性能分析工具</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#7-1-Unity-Profiler"><span class="toc-number">1.8.1.</span> <span class="toc-text">7.1 Unity Profiler</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-2-%E6%9F%A5%E6%89%BE%E8%A3%85%E7%AE%B1"><span class="toc-number">1.8.2.</span> <span class="toc-text">7.2 查找装箱</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-3-%E4%BD%BF%E7%94%A8-IL-%E6%9F%A5%E7%9C%8B%E5%99%A8"><span class="toc-number">1.8.3.</span> <span class="toc-text">7.3 使用 IL 查看器</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E6%80%BB%E7%BB%93"><span class="toc-number">1.9.</span> <span class="toc-text">8. 总结</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%98%E5%8C%96%E4%BC%98%E5%85%88%E7%BA%A7"><span class="toc-number">1.9.1.</span> <span class="toc-text">优化优先级</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E5%8E%9F%E5%88%99"><span class="toc-number">1.9.2.</span> <span class="toc-text">核心原则</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="toc-number">1.10.</span> <span class="toc-text">参考资料</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/" title="Unity 垃圾回收最佳实践"><img src="/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Unity 垃圾回收最佳实践"/></a><div class="content"><a class="title" href="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/" title="Unity 垃圾回收最佳实践">Unity 垃圾回收最佳实践</a><time datetime="2026-03-29T06:24:06.000Z" title="发表于 2026-03-29 14:24:06">2026-03-29</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2026 By moss</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 7.3.0</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.5.4</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="前往评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"><script>(() => {
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+  const option = null
+
+  const getGiscusTheme = theme => theme === 'dark' ? 'dark' : 'light'
+
+  const createScriptElement = config => {
+    const ele = document.createElement('script')
+    Object.entries(config).forEach(([key, value]) => {
+      ele.setAttribute(key, value)
+    })
+    return ele
+  }
+
+  const loadGiscus = (el = document, key) => {
+    const mappingConfig = isShuoshuo
+      ? { 'data-mapping': 'specific', 'data-term': key }
+      : { 'data-mapping': (option && option['data-mapping']) || 'pathname' }
+
+    const giscusConfig = {
+      src: 'https://giscus.app/client.js',
+      'data-repo': 'PennyZJR/PennyZJR.github.io',
+      'data-repo-id': 'R_kgDORzMgnA',
+      'data-category-id': 'DIC_kwDORzMgnM4C5ewV',
+      'data-theme': getGiscusTheme(document.documentElement.getAttribute('data-theme')),
+      'data-reactions-enabled': '1',
+      crossorigin: 'anonymous',
+      async: true,
+      ...option,
+      ...mappingConfig
+    }
+
+    const scriptElement = createScriptElement(giscusConfig)
+
+    el.querySelector('#giscus-wrap').appendChild(scriptElement)
+
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyGiscus = () => {
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+  }
+
+  const changeGiscusTheme = theme => {
+    const iframe = document.querySelector('#giscus-wrap iframe')
+    if (iframe) {
+      const message = {
+        giscus: {
+          setConfig: {
+            theme: getGiscusTheme(theme)
+          }
+        }
+      }
+      iframe.contentWindow.postMessage(message, 'https://giscus.app')
+    }
+  }
+
+  btf.addGlobalFn('themeChange', changeGiscusTheme, 'giscus')
+
+  if (isShuoshuo) {
+    'Giscus' === 'Giscus'
+      ? window.shuoshuoComment = { loadComment: loadGiscus }
+      : window.loadOtherComment = loadGiscus
+    return
+  }
+
+  if ('Giscus' === 'Giscus' || !false) {
+    if (false) btf.loadComment(document.getElementById('giscus-wrap'), loadGiscus)
+    else loadGiscus()
+  } else {
+    window.loadOtherComment = loadGiscus
+  }
+})()</script></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索文章" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.5.4"></script></div></div></body></html>
