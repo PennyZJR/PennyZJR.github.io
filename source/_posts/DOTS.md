@@ -123,4 +123,9 @@ keywords: Unity, DOTS，ECS，JobSystem，Burst
 
 由于`Entity`上挂载的都是`struct`，如果直接获取获取到的是副本，并不会对内存中的数据产生影响，所以使用`ref`引用传递。
 
-`RefRW`代表 Read&Write ，`RefRO`代表 ReadOnly
+`RefRW`代表 Read&Write ，`RefRO`代表 ReadOnly。
+
+![image-20260331171706185](DOTS/image-20260331171706185.png)
+
+>  由于`MosueWorldPosition`是继承了`Mono`的单例，在用`[BurstCompile]`属性标记的函数下会发生报错，后续会解决这个问题。
+
