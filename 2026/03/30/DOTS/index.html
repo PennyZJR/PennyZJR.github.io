@@ -1,0 +1,304 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Unity DOTS | Moss's Blog</title><meta name="author" content="moss"><meta name="copyright" content="moss"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="ffffff"><meta name="description" content="Unity中的DOTS记录">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Unity DOTS">
+<meta property="og:url" content="https://pennyzjr.github.io/2026/03/30/DOTS/index.html">
+<meta property="og:site_name" content="Moss&#39;s Blog">
+<meta property="og:description" content="Unity中的DOTS记录">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://pennyzjr.github.io/2026/03/30/DOTS/cover.png">
+<meta property="article:published_time" content="2026-03-30T08:24:06.000Z">
+<meta property="article:modified_time" content="2026-03-31T07:41:46.832Z">
+<meta property="article:author" content="moss">
+<meta property="article:tag" content="Unity">
+<meta property="article:tag" content="DOTS">
+<meta property="article:tag" content="ECS">
+<meta property="article:tag" content="JobSystem">
+<meta property="article:tag" content="Burst">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://pennyzjr.github.io/2026/03/30/DOTS/cover.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Unity DOTS",
+  "url": "https://pennyzjr.github.io/2026/03/30/DOTS/",
+  "image": "https://pennyzjr.github.io/2026/03/30/DOTS/cover.png",
+  "datePublished": "2026-03-30T08:24:06.000Z",
+  "dateModified": "2026-03-31T07:41:46.832Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "moss",
+      "url": "https://PennyZJR.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/cowcat.png"><link rel="canonical" href="https://pennyzjr.github.io/2026/03/30/DOTS/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', 'ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          const mediaQueryDark = window.matchMedia('(prefers-color-scheme: dark)')
+          const mediaQueryLight = window.matchMedia('(prefers-color-scheme: light)')
+
+          if (theme === undefined) {
+            if (mediaQueryLight.matches) activateLightMode()
+            else if (mediaQueryDark.matches) activateDarkMode()
+            else {
+              const hour = new Date().getHours()
+              const isNight = hour <= 6 || hour >= 18
+              isNight ? activateDarkMode() : activateLightMode()
+            }
+            mediaQueryDark.addEventListener('change', () => {
+              if (saveToLocal.get('theme') === undefined) {
+                e.matches ? activateDarkMode() : activateLightMode()
+              }
+            })
+          } else {
+            theme === 'light' ? activateLightMode() : activateDarkMode()
+          }
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: true
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Unity DOTS',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/moss.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">2</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">9</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url(/img/default_top_img.png);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/cowcat.png" alt="Logo"><span class="site-name">Moss's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">Unity DOTS</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">Unity DOTS</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-30T08:24:06.000Z" title="发表于 2026-03-30 16:24:06">2026-03-30</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-03-31T07:41:46.832Z" title="更新于 2026-03-31 15:41:46">2026-03-31</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%B8%B8%E6%88%8F%E5%BC%80%E5%8F%91/">游戏开发</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%B8%B8%E6%88%8F%E5%BC%80%E5%8F%91/Unity/">Unity</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="DOTS"><a href="#DOTS" class="headerlink" title="DOTS"></a>DOTS</h1><h2 id="ECS"><a href="#ECS" class="headerlink" title="ECS"></a>ECS</h2><h3 id="Mono的“不连续内存”和ECS的“连续内存”"><a href="#Mono的“不连续内存”和ECS的“连续内存”" class="headerlink" title="Mono的“不连续内存”和ECS的“连续内存”"></a>Mono的“不连续内存”和ECS的“连续内存”</h3><ul>
+<li><p><strong><code>MonoBehaviour</code>&#x2F;<code>OOP</code>的内存结构</strong></p>
+<p>每个对象是单独分配在堆上的，地址是随机分散的</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Enemy1 → 0x1000</span><br><span class="line">Enemy2 → 0x8A23</span><br><span class="line">Enemy3 → 0x41F0</span><br><span class="line">Enemy4 → 0xC120</span><br></pre></td></tr></table></figure>
+
+<p>访问时：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">CPU:</span><br><span class="line">跳 → 0x1000</span><br><span class="line">跳 → 0x8A23</span><br><span class="line">跳 → 0x41F0</span><br></pre></td></tr></table></figure>
+
+<p>问题：内存分散，cache miss多，性能差</p>
+</li>
+<li><p><strong><code>ECS</code>的内存结构</strong></p>
+<p><code>ECS</code>是连续内存布局，相同数据连续分布在一起，对CPU缓存友好</p>
+<p>Unity把相同组件组合的数据放进Chunk（16KB连续内存）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Chunk:</span><br><span class="line"></span><br><span class="line">Position: [P1][P2][P3][P4][P5]</span><br><span class="line">Velocity: [V1][V2][V3][V4][V5]</span><br></pre></td></tr></table></figure>
+
+<p>访问时：</p>
+<figure class="highlight c#"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">foreach</span> (<span class="keyword">var</span> pos <span class="keyword">in</span> SystemAPI.Query&lt;RefRW&lt;Position&gt;&gt;())</span><br><span class="line">&#123;</span><br><span class="line">    pos.ValueRW.x += <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">CPU 一次读取：</span><br><span class="line">[P1 P2 P3 P4 P5]</span><br></pre></td></tr></table></figure>
+
+<p>特点：顺序访问，cache命中高</p>
+<ul>
+<li><p><strong>关键结论</strong></p>
+<ul>
+<li><code>struct</code>本身并不保证连续内存</li>
+<li><code>ECS</code>的Chunk+Archetype才保证连续</li>
+</ul>
+</li>
+<li><p><strong>核心机制</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">Archetype = 组件组合类型</span><br><span class="line"></span><br><span class="line">例如：</span><br><span class="line">[Position + Velocity]</span><br><span class="line"></span><br><span class="line">↓</span><br><span class="line"></span><br><span class="line">Chunk（只存这一类Entity）：</span><br><span class="line"></span><br><span class="line">[Position数组][Velocity数组]</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+</ul>
+<h3 id="Entity"><a href="#Entity" class="headerlink" title="Entity"></a>Entity</h3><p>通过在场景中创建<code>subScene</code>，在<code>subScene</code>中创建的物体会被烘焙为<code>Entity</code></p>
+<h3 id="Component"><a href="#Component" class="headerlink" title="Component"></a>Component</h3><p>自定义的<code>Component</code>通过继承<code>IComponentData</code>接口来实现，只包含数据，也不必像在<code>MonoBehaviour</code>中对一个数据进行<code>private</code>私有化并用一个属性暴露接口，直接用<code>public</code>修饰即可。</p>
+<p>自定义的<code>Component</code>加到<code>Entity</code>上可以通过继承<code>Baker&lt;T&gt;</code>类来实现，并<code>override</code>其中的<code>Bake</code>函数即可，但是需要额外新增一个继承<code>MonoBehaviour</code>的脚本挂载到<code>Unit</code>身上来执行这段逻辑：</p>
+<p><img src="/image-20260331152115176.png" alt="image-20260331152115176"></p>
+<p><code>Mono</code>能让我们在Inspector窗口中直接填参数</p>
+<h3 id="System"><a href="#System" class="headerlink" title="System"></a>System</h3><h4 id="ISystem和SystemBase的区别"><a href="#ISystem和SystemBase的区别" class="headerlink" title="ISystem和SystemBase的区别"></a>ISystem和SystemBase的区别</h4><p><code>ISystem</code>是接口，能用结构体继承实现，<code>SystemBase</code>是抽象类，一般使用<code>ISystem</code>，因为其无GC且对Burst友好。</p>
+<blockquote>
+<p>GC的本质是在堆上分配的对象变成了垃圾，需要进行回收，并不是使用了引用类型就一定会触发GC</p>
+</blockquote>
+<p><img src="/image-20260331152215194.png" alt="image-20260331152215194"></p>
+<p>由于<code>Entity</code>上挂载的都是<code>struct</code>，如果直接获取获取到的是副本，并不会对内存中的数据产生影响，所以使用<code>ref</code>引用传递。</p>
+<p><code>RefRW</code>代表 Read&amp;Write ，<code>RefRO</code>代表 ReadOnly</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://PennyZJR.github.io">moss</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://pennyzjr.github.io/2026/03/30/DOTS/">https://pennyzjr.github.io/2026/03/30/DOTS/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://PennyZJR.github.io" target="_blank">Moss's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Unity/">Unity</a><a class="post-meta__tags" href="/tags/DOTS/">DOTS</a><a class="post-meta__tags" href="/tags/ECS/">ECS</a><a class="post-meta__tags" href="/tags/JobSystem/">JobSystem</a><a class="post-meta__tags" href="/tags/Burst/">Burst</a></div><div class="post-share"><div class="social-share" data-image="/2026/03/30/DOTS/cover.png" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/" title="Unity 垃圾回收最佳实践"><img class="cover" src="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Unity 垃圾回收最佳实践</div></div><div class="info-2"><div class="info-item-1">Unity 垃圾回收最佳实践前言在 Unity 游戏开发中，垃圾回收（Garbage Collection，简称 GC）是影响游戏性能的关键因素之一。当 GC 触发时，游戏主线程会被暂停，导致帧率下降、卡顿等问题。特别是在移动设备上，频繁的 GC 甚至会造成明显的卡顿感。 本文基于 Unity 官方文档，详细讲解 GC 产生的原因以及优化技巧，帮助你写出高性能的游戏代码。  1. 理解 Unity 的 GC 机制1.1 什么是托管堆（Managed Heap）在 C# 中，内存分为两种：  栈（Stack）：存储值类型（int、float、struct 等），自动管理 托管堆（Managed Heap）：存储引用类型（class、string、array 等），由 GC 管理  当你创建一个引用类型对象时，Unity 会在托管堆上分配内存。当这个对象不再被引用时，GC 会回收这块内存。 1.2 Unity 的 GC 特点重要：Unity 的 GC 不是分代式的（Non-generational） .NET 的 GC 是分代式的，可以高效处理大量小对象。但 Unity 使用的是 B...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/" title="Unity 垃圾回收最佳实践"><img class="cover" src="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.png" alt="cover"><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-03-29</div><div class="info-item-2">Unity 垃圾回收最佳实践</div></div><div class="info-2"><div class="info-item-1">Unity 垃圾回收最佳实践前言在 Unity 游戏开发中，垃圾回收（Garbage Collection，简称 GC）是影响游戏性能的关键因素之一。当 GC 触发时，游戏主线程会被暂停，导致帧率下降、卡顿等问题。特别是在移动设备上，频繁的 GC 甚至会造成明显的卡顿感。 本文基于 Unity 官方文档，详细讲解 GC 产生的原因以及优化技巧，帮助你写出高性能的游戏代码。  1. 理解 Unity 的 GC 机制1.1 什么是托管堆（Managed Heap）在 C# 中，内存分为两种：  栈（Stack）：存储值类型（int、float、struct 等），自动管理 托管堆（Managed Heap）：存储引用类型（class、string、array 等），由 GC 管理  当你创建一个引用类型对象时，Unity 会在托管堆上分配内存。当这个对象不再被引用时，GC 会回收这块内存。 1.2 Unity 的 GC 特点重要：Unity 的 GC 不是分代式的（Non-generational） .NET 的 GC 是分代式的，可以高效处理大量小对象。但 Unity 使用的是 B...</div></div></div></a></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="giscus-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/moss.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">moss</div><div class="author-info-description">游戏开发 | Unity | C#</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">2</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">9</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/PennyZJR"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/PennyZJR" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:Z20240314Z@163.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到 Moss's Blog！</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#DOTS"><span class="toc-number">1.</span> <span class="toc-text">DOTS</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#ECS"><span class="toc-number">1.1.</span> <span class="toc-text">ECS</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Mono%E7%9A%84%E2%80%9C%E4%B8%8D%E8%BF%9E%E7%BB%AD%E5%86%85%E5%AD%98%E2%80%9D%E5%92%8CECS%E7%9A%84%E2%80%9C%E8%BF%9E%E7%BB%AD%E5%86%85%E5%AD%98%E2%80%9D"><span class="toc-number">1.1.1.</span> <span class="toc-text">Mono的“不连续内存”和ECS的“连续内存”</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Entity"><span class="toc-number">1.1.2.</span> <span class="toc-text">Entity</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Component"><span class="toc-number">1.1.3.</span> <span class="toc-text">Component</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#System"><span class="toc-number">1.1.4.</span> <span class="toc-text">System</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#ISystem%E5%92%8CSystemBase%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-number">1.1.4.1.</span> <span class="toc-text">ISystem和SystemBase的区别</span></a></li></ol></li></ol></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2026/03/30/DOTS/" title="Unity DOTS"><img src="/2026/03/30/DOTS/cover.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Unity DOTS"/></a><div class="content"><a class="title" href="/2026/03/30/DOTS/" title="Unity DOTS">Unity DOTS</a><time datetime="2026-03-30T08:24:06.000Z" title="发表于 2026-03-30 16:24:06">2026-03-30</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/" title="Unity 垃圾回收最佳实践"><img src="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/cover.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Unity 垃圾回收最佳实践"/></a><div class="content"><a class="title" href="/2026/03/29/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/" title="Unity 垃圾回收最佳实践">Unity 垃圾回收最佳实践</a><time datetime="2026-03-29T06:24:06.000Z" title="发表于 2026-03-29 14:24:06">2026-03-29</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2026 By moss</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 7.3.0</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.5.4</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="前往评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"><script>(() => {
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+  const option = null
+
+  const getGiscusTheme = theme => theme === 'dark' ? 'dark' : 'light'
+
+  const createScriptElement = config => {
+    const ele = document.createElement('script')
+    Object.entries(config).forEach(([key, value]) => {
+      ele.setAttribute(key, value)
+    })
+    return ele
+  }
+
+  const loadGiscus = (el = document, key) => {
+    const mappingConfig = isShuoshuo
+      ? { 'data-mapping': 'specific', 'data-term': key }
+      : { 'data-mapping': (option && option['data-mapping']) || 'pathname' }
+
+    const giscusConfig = {
+      src: 'https://giscus.app/client.js',
+      'data-repo': 'PennyZJR/PennyZJR.github.io',
+      'data-repo-id': 'R_kgDORzMgnA',
+      'data-category-id': 'DIC_kwDORzMgnM4C5ewV',
+      'data-theme': getGiscusTheme(document.documentElement.getAttribute('data-theme')),
+      'data-reactions-enabled': '1',
+      crossorigin: 'anonymous',
+      async: true,
+      ...option,
+      ...mappingConfig
+    }
+
+    const scriptElement = createScriptElement(giscusConfig)
+
+    el.querySelector('#giscus-wrap').appendChild(scriptElement)
+
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyGiscus = () => {
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+  }
+
+  const changeGiscusTheme = theme => {
+    const iframe = document.querySelector('#giscus-wrap iframe')
+    if (iframe) {
+      const message = {
+        giscus: {
+          setConfig: {
+            theme: getGiscusTheme(theme)
+          }
+        }
+      }
+      iframe.contentWindow.postMessage(message, 'https://giscus.app')
+    }
+  }
+
+  btf.addGlobalFn('themeChange', changeGiscusTheme, 'giscus')
+
+  if (isShuoshuo) {
+    'Giscus' === 'Giscus'
+      ? window.shuoshuoComment = { loadComment: loadGiscus }
+      : window.loadOtherComment = loadGiscus
+    return
+  }
+
+  if ('Giscus' === 'Giscus' || !false) {
+    if (false) btf.loadComment(document.getElementById('giscus-wrap'), loadGiscus)
+    else loadGiscus()
+  } else {
+    window.loadOtherComment = loadGiscus
+  }
+})()</script></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索文章" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.5.4"></script></div></div></body></html>
