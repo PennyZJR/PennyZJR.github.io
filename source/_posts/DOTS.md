@@ -14,6 +14,7 @@ cover: cover.png
 top_img: /img/default_top_img.png
 toc: true
 description: Unity中的DOTS记录
+typora-copy-images-to: DOTS
 keywords: Unity, DOTS，ECS，JobSystem，Burst
 ---
 
