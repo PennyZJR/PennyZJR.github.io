@@ -107,7 +107,7 @@ keywords: Unity, DOTS，ECS，JobSystem，Burst
 
 自定义的`Component`加到`Entity`上可以通过继承`Baker<T>`类来实现，并`override`其中的`Bake`函数即可，但是需要额外新增一个继承`MonoBehaviour`的脚本挂载到`Unit`身上来执行这段逻辑：
 
-![image-20260331161802367](image-20260331161802367.png)
+![image-20260331163103167](DOTS/image-20260331163103167.png)
 
 `Mono`能让我们在Inspector窗口中直接填参数
 
@@ -119,7 +119,7 @@ keywords: Unity, DOTS，ECS，JobSystem，Burst
 
 > GC的本质是在堆上分配的对象变成了垃圾，需要进行回收，并不是使用了引用类型就一定会触发GC
 
-![image-20260331161748096](image-20260331161748096.png)
+![image-20260331163115675](DOTS/image-20260331163115675.png)
 
 由于`Entity`上挂载的都是`struct`，如果直接获取获取到的是副本，并不会对内存中的数据产生影响，所以使用`ref`引用传递。
 
